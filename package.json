@@ -1,0 +1,29 @@
+{
+  "name": "rev-proxy",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "A reverse proxy, based on Node.js Express, server to manage multiple micro-services as a single web application.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vasilnedev/rev-proxy.git"
+  },
+  "keywords": [
+    "express",
+    "reverse",
+    "proxy"
+  ],
+  "author": "Vasil Nedev",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/vasilnedev/rev-proxy/issues"
+  },
+  "homepage": "https://github.com/vasilnedev/rev-proxy#readme",
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-http-proxy": "^2.1.1"
+  }
+}
