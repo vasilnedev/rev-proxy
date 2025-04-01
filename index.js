@@ -13,10 +13,7 @@ const app = express()
 const port = 3000
 
 // Enable CORS for all routes
-app.use( cors({
-  origin: 'https://nedev.digital', // Change this to your domain
-  optionsSuccessStatus: 200
-}))
+app.use( cors())
 
 // Middleware to allow only GET requests
 const allowOnlyGet = (req, res, next) => {
