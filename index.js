@@ -2,6 +2,7 @@ import fs from 'fs'
 import https from 'https'
 import express from 'express'
 import proxy from 'express-http-proxy'
+import cors from 'cors'
 
 /* 
   This is a simple reverse proxy server that forwards requests to multiple micro-services within a VPN e.g.:
@@ -10,6 +11,12 @@ import proxy from 'express-http-proxy'
 
 const app = express()
 const port = 3000
+
+// Enable CORS for all routes
+app.use( cors({
+  origin: 'https://nedev.digital', // Change this to your domain
+  optionsSuccessStatus: 200
+}))
 
 // Middleware to allow only GET requests
 const allowOnlyGet = (req, res, next) => {
