@@ -1,9 +1,11 @@
+import fs from 'fs'
+import https from 'https'
 import express from 'express'
 import proxy from 'express-http-proxy'
 
 /* 
   This is a simple reverse proxy server that forwards requests to multiple micro-services within a VPN e.g.:
-  * BIM application and its models stored in MinIO server at http://bim-app.server:9000
+  * BIM fornt-end application and models stored in MinIO server at http://bim-app.server:9000
 */
 
 const app = express()
@@ -39,10 +41,19 @@ app.use('/models',
 )
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).send('OK')
-})
+app.get('/health', (req, res) => res.status(200).send('OK') )
 
-app.listen( port , () => {
+/* 
+  For SSL store certificates in 'certs' folder.
+  If SSL is not required, replace 'https.createServer' with 'app' to run Express
+*/
+const options = {
+  key: fs.readFileSync("certs/server.key"),
+  cert: fs.readFileSync("certs/certificate.crt"),
+  ca: fs.readFileSync('certs/intermediate.crt')
+}
+
+https.createServer( options, app)
+.listen( port , () => {
   console.log(`Server running on port ${port}`)
 })
