@@ -5,12 +5,13 @@ import proxy from 'express-http-proxy'
 import cors from 'cors'
 
 /* 
-  This is a simple reverse proxy server that forwards requests to multiple micro-services within a VPN e.g.:
+  This is a simple reverse proxy server that forwards requests to multiple micro-services within a VPN to
+  enable secure (SSL) access to the folowing services:
   * BIM fornt-end application and models stored in MinIO server at http://bim-app.server:9000
 */
 
 const app = express()
-const port = 3000
+const port = 443 // Default SSL poert
 
 // Enable CORS for all routes
 app.use( cors())
@@ -28,7 +29,7 @@ app.get('/', (req, res) => {
   res.redirect('/bim-app/index.html');
 });
 
-// Proxy for /bim-app
+// Proxy to 'bim-app' bucket 
 app.use('/bim-app', 
   allowOnlyGet, 
   proxy('http://bim-app.server:9000', {
@@ -36,11 +37,19 @@ app.use('/bim-app',
   })
 )
 
-// Proxy for /models
+// Proxy to 'models' bucket
 app.use('/models', 
   allowOnlyGet, 
   proxy('http://bim-app.server:9000', {
     proxyReqPathResolver: req => { return `/models${req.url}` }
+  })
+)
+
+// Proxy to 'documents' bucket
+app.use('/documents', 
+  allowOnlyGet, 
+  proxy('http://bim-app.server:9000', {
+    proxyReqPathResolver: req => { return `/documents${req.url}` }
   })
 )
 
