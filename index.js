@@ -44,9 +44,6 @@ app.use('/models',
   })
 )
 
-// Health check endpoint
-app.get('/health', (req, res) => res.status(200).send('OK') )
-
 /* 
   For SSL store certificates in 'certs' folder.
   If SSL is not required, replace 'https.createServer' with 'app' to run Express
@@ -58,6 +55,4 @@ const options = {
 }
 
 https.createServer( options, app)
-.listen( port , () => {
-  console.log(`Server running on port ${port}`)
-})
+.listen( port , () => console.log(`Server running on port ${port}`))
