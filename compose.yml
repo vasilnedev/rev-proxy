@@ -19,8 +19,8 @@ services:
     restart: always
 
     ports:
-      - published: 3000
-        target: 3000
+      - published: 443
+        target: 443
 
     volumes:
     - type: volume
