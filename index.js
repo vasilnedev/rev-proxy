@@ -11,7 +11,7 @@ import cors from 'cors'
 */
 
 const app = express()
-const port = 443 // Default SSL poert
+const port = 443 // Default https port
 
 // Enable CORS for all routes
 app.use( cors())
@@ -54,8 +54,8 @@ app.use('/documents',
 )
 
 /* 
-  For SSL store certificates in 'certs' folder.
-  If SSL is not required, replace 'https.createServer' with 'app' to run Express
+  Store SSL certificates in 'certs' folder.
+  If https is not required, replace 'https.createServer' with 'app' to run Express without SSL.
 */
 const options = {
   key: fs.readFileSync("certs/server.key"),
