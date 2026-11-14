@@ -1,17 +1,18 @@
 import fs from 'fs'
 import https from 'https'
+import { randomUUID } from 'crypto'
 import express from 'express'
 import proxy from 'express-http-proxy'
 import cors from 'cors'
+import pino from 'pino'
+import pinoHttp from 'pino-http'
 
-/* 
-  This is a simple reverse proxy server that forwards requests to multiple micro-services within a VPN to
-  enable secure (SSL) access to the folowing services:
-  * BIM fornt-end application and models stored in MinIO server at http://bim-app.server:9000
+/*
+  This is a simple reverse proxy server, including SSL, that forwards requests to multiple micro-services within a VPN.
 */
 
 const app = express()
-const port = 443 // Default https port
+const port = 443 // Default SSL poert
 
 // Enable CORS for all routes
 app.use( cors())
@@ -24,24 +25,26 @@ const allowOnlyGet = (req, res, next) => {
   next()
 }
 
-// Redirect the main route to /bim-app
+// Shared proxy error handler: respond with 502 and attach the error to the access log line
+const onProxyError = (err, res, next) => {
+  res.err = err // pino-http logs this with the "request errored" entry
+  if (!res.headersSent) res.status(502).send('Bad Gateway')
+}
+
+const proxyTimeout = 10000 // ms
+
+// Redirect the main route to /blog
 app.get('/', (req, res) => {
-  res.redirect('/bim-app/index.html');
-});
+  res.redirect('/blog')
+})
 
-// Proxy to 'bim-app' bucket 
-app.use('/bim-app', 
-  allowOnlyGet, 
-  proxy('http://bim-app.server:9000', {
-    proxyReqPathResolver: req => { return `/bim-app${req.url}` }
-  })
-)
-
-// Proxy to 'models' bucket
-app.use('/models', 
-  allowOnlyGet, 
-  proxy('http://bim-app.server:9000', {
-    proxyReqPathResolver: req => { return `/models${req.url}` }
+// Proxy to blog url
+app.use('/blog',
+  allowOnlyGet,
+  proxy('http://blog.server', {
+    timeout: proxyTimeout,
+    proxyErrorHandler: onProxyError,
+    proxyReqPathResolver: req => req.url === '/' ? '/blog' : `/blog${req.url}`
   })
 )
 
@@ -54,8 +57,8 @@ app.use('/documents',
 )
 
 /* 
-  Store SSL certificates in 'certs' folder.
-  If https is not required, replace 'https.createServer' with 'app' to run Express without SSL.
+  For SSL store certificates in 'certs' folder.
+  If SSL is not required, replace 'https.createServer' with 'app' to run Express
 */
 const options = {
   key: fs.readFileSync("certs/server.key"),
@@ -64,4 +67,10 @@ const options = {
 }
 
 https.createServer( options, app)
-.listen( port , () => console.log(`Server running on port ${port}`))
+.listen( port , () => logger.info({ port }, 'server started'))
+
+process.on('unhandledRejection', err => logger.error({ err }, 'unhandled rejection'))
+process.on('uncaughtException', err => {
+  logger.fatal({ err }, 'uncaught exception')
+  process.exit(1)
+})

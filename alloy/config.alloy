@@ -1,0 +1,51 @@
+// Collects the JSON logs of the reverse proxy container and ships them to Loki
+
+discovery.docker "all" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Keep only the proxy container ("server" service in compose.yml)
+discovery.relabel "proxy" {
+  targets = discovery.docker.all.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "server"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+}
+
+loki.source.docker "proxy" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.proxy.output
+  forward_to = [loki.process.json.receiver]
+}
+
+// Parse pino's JSON. Only low-cardinality fields become labels (never path, IP or status).
+loki.process "json" {
+  stage.json {
+    expressions = { level = "", service = "", time = "" }
+  }
+
+  stage.labels {
+    values = { level = "", service = "" }
+  }
+
+  stage.timestamp {
+    source = "time"
+    format = "RFC3339"
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

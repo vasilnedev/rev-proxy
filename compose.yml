@@ -8,6 +8,9 @@ volumes:
       type: none
       device: $PWD
       o: bind
+  loki-data:
+  alloy-data:
+  grafana-data:
 
 services:
   server:
@@ -26,3 +29,45 @@ services:
     - type: volume
       source: server-vol
       target: /usr/src/app
+
+    # Rotate the Docker log files that Alloy reads
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Log database (30-day retention, see loki/config.yaml)
+  loki:
+    image: grafana/loki:3.7.9
+    command: -config.file=/etc/loki/config.yaml
+    restart: always
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+
+  # Log collector: reads the proxy container's logs via the Docker socket and pushes them to Loki
+  alloy:
+    image: grafana/alloy:v1.21.3
+    command: run /etc/alloy/config.alloy --storage.path=/var/lib/alloy/data
+    restart: always
+    depends_on:
+      - loki
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+
+  # Log UI, published only on the VPN/LAN address of this host
+  grafana:
+    image: grafana/grafana:13.3.0
+    restart: always
+    depends_on:
+      - loki
+    environment:
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    ports:
+      - "192.168.0.10:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
