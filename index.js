@@ -12,7 +12,53 @@ import pinoHttp from 'pino-http'
 */
 
 const app = express()
-const port = 443 // Default SSL poert
+const port = 443 // Default SSL port
+
+/*
+  Logging
+  Structured JSON is written to stdout. Grafana Alloy collects it from the Docker logs and ships it to Loki
+  (see compose.yml and alloy/config.alloy).
+*/
+const logger = pino({
+  level: process.env.LOG_LEVEL ?? 'info',
+  formatters: { level: label => ({ level: label }) }, // "info" instead of 30, easier to query in Loki
+  timestamp: pino.stdTimeFunctions.isoTime
+})
+
+// Path prefixes that are proxied below; keep in sync when adding a service
+const knownServices = new Set(['blog', 'thoughts'])
+
+// Registered first, so that every response (including 405s, redirects and CORS preflights) is logged
+app.use(pinoHttp({
+  logger,
+  genReqId: (req, res) => {
+    const id = randomUUID() // Always generated here, never trusted from the client at the edge
+    res.setHeader('X-Request-Id', id)
+    return id
+  },
+  customLogLevel: (req, res, err) =>
+    err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
+  // Upstream service name from the first path segment. Unknown paths (e.g. bot scans for /.env) are grouped
+  // as "other" to keep the Loki label low-cardinality.
+  customProps: req => {
+    const segment = req.originalUrl.split('/')[1].split('?')[0]
+    return { service: segment === '' ? 'root' : knownServices.has(segment) ? segment : 'other' }
+  },
+  serializers: {
+    req: req => ({
+      id: req.id,
+      method: req.method,
+      path: req.url.split('?')[0], // Query strings are left out of the logs
+      ip: req.remoteAddress,
+      ua: req.headers['user-agent'],
+      referer: req.headers['referer']
+    }),
+    res: res => ({
+      status: res.statusCode,
+      bytes: res.headers?.['content-length']
+    })
+  }
+}))
 
 // Enable CORS for all routes
 app.use( cors())
@@ -48,17 +94,24 @@ app.use('/blog',
   })
 )
 
-// Proxy to 'documents' bucket
-app.use('/documents', 
-  allowOnlyGet, 
-  proxy('http://bim-app.server:9000', {
-    proxyReqPathResolver: req => { return `/documents${req.url}` }
+// Proxy to thoughts url
+app.use('/thoughts',
+  (req, res, next) => {
+    // Nuxt Content fetches page data with POST
+    if (req.method === 'POST' && req.url.startsWith('/__nuxt_content/')) return next()
+    allowOnlyGet(req, res, next)
+  },
+  proxy('http://thoughts.server:3000', {
+    timeout: proxyTimeout,
+    proxyErrorHandler: onProxyError,
+    // originalUrl keeps the full path, including the trailing slash, so there's no redirect loop
+    proxyReqPathResolver: req => req.originalUrl
   })
 )
 
-/* 
-  For SSL store certificates in 'certs' folder.
-  If SSL is not required, replace 'https.createServer' with 'app' to run Express
+
+/*
+  SSL configuration
 */
 const options = {
   key: fs.readFileSync("certs/server.key"),
